@@ -6,6 +6,10 @@
     <script src="novus-nvd3-e91cf0a/nv.d3.js"></script>
     <script src="test.js"></script>
     <style type="text/css">
+      ul.resultList {
+      list-style-type:none;width:200px
+      }
+
       li.result {
       background-color:#CCCCCC;
       position:relative;
@@ -15,45 +19,96 @@
       padding-left:5px;
       padding-right:10px
       }
+
       li.selectedResult {
       background-color:#FF9999;
       }
+
+      .queryId {
+      float:left;
+      font-size:10px;
+      }
+
+      .queryText {
+      clear:both;
+      margin-left:5px;
+      font-family:monospace;
+      }
+
+      .queryFilter {
+      font-size:10px
+      }
+
+      .queryResultCount {
+      position:absolute;
+      right:0;
+      bottom:0;
+      font-size:10px;
+      padding-right:10px
+      }
+
+      .chartBox {
+      float:left
+      }
+
+      .chartList {
+      list-style-type:none;
+      margin:0;
+      padding:0;
+      height:80px
+      }
+
+      .chartOption {
+      float:left;
+      width:100px;
+      display:block;
+      background-color:#99CFCC;
+      text-align:center;
+      border-width:0px 1px 0px 0px;
+      border-style:solid
+      }
+
+      li.selectedChart {
+      background-color:#FF9999;
+      }
+
     </style>
   </head>
   <body ng-controller="QueryCtrl"> <!-- ng-controller="RootCtrl" -->
     <div style="width:100%">
       <div style="width:300px;float:left">
         <h3>Queries</h3>
-        <p style="font-size:10px">Filter:<input ng-model="search"></input></p>
-        <ul style="list-style-type:none;width:200px">
-          <li ng-repeat="result in results | filter:search"
-              class="result"
+        <p class="queryFilter">
+          Filter:<input ng-model="search"></input>
+        </p>
+        <ul class="resultList">
+          <li class="result"
+              ng-repeat="result in results | filter:search"
               ng-class="{ selectedResult: result == selectedResult }"
               ng-click="selectResult(result)">
-
-            <span class="queryid" style="float:left;font-size:10px">#{{result.id}}</span>
-            <p style="clear:both;margin-left:5px;font-family:monospace">
+            <span class="queryId">
+              #{{result.id}}
+            </span>
+            <p class="queryText">
               {{result.query}}
             </p>
-            <p style="position:absolute;right:0;bottom:0;font-size:10px;padding-right:10px">
-              (<ng-pluralize count="result.data.length" when="resultForms"></ng-pluralize>)
+            <p class="queryResultCount">
+              (<ng-pluralize count="result.data.length" when="resultForms">
+              </ng-pluralize>)
             </p> 
           </li>
         </ul>
       </div>
-      <div style="float:left" ng-controller="ChartCtrl">
-        <ul style="list-style-type:none;margin:0;padding:0;height:80px">
-          <li style="float:left;width:100px;display:block;background-color:#99CFCC;
-                     text-align:center;border-width:0px 1px 0px 0px;border-style:solid"
-              ng-repeat="chart in availableCharts()">{{chart.chartName}}</li>
+      <div class="chartBox"style="" ng-controller="ChartCtrl">
+        <ul class="chartList">
+          <li class="chartOption"
+              ng-repeat="chart in availableCharts()"
+              ng-class="{ selectedChart: chart == selectedChart }"
+              ng-click="selectChart(chart)">
+            {{chart.chartName}}
+          </li>
         </ul>
       </div>
     </div>
-<!--    <div>
-      <label>Name:</label>
-      <input type="text" ng-model="yourName" placeholder="Enter a name here">
-      <hr>
-      <h1>Hello {{yourName}}!</h1>
-    </div> -->
   </body>
 </html>

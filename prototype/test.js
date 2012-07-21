@@ -29,7 +29,7 @@ function ChartCtrl($scope) {
         // query result, reuse that; otherwise, reinitialize
         if (!$scope.selectedChart || !$scope.selectedChart.accepts(queryResult)) {
             // We assume that at least one chart will always be available
-            $scope.selectChart($scope.availableCharts()[0].chartName);
+            $scope.selectChart($scope.availableCharts()[0]);
         }
     });
 
@@ -43,20 +43,15 @@ function ChartCtrl($scope) {
         $scope.registeredCharts.push(chartFn);
     }
 
-    $scope.selectChart = function(chartName) {
-        if ($scope.selectedChart && $scope.selectedChart.chartName == chartName) {
+    $scope.selectChart = function(chart) {
+        if ($scope.selectedChart && $scope.selectedChart == chart) {
             return;
         }
-        var selected = null;
-        for (var chartFn in $scope.registeredCharts) {
-            if (chartFn.chartName === chartName) {
-                selected = chartFn;
-                break;
-            }
-        }
-        if (selected) {
-            $scope.selectedChart = selected;
-            loadChart(selected, queryResult);
+        
+        if (chart) {
+            window.console.log("selected " + chart.chartName);
+            $scope.selectedChart = chart;
+            loadChart(chart);
         } else {
             // error or something
         }
@@ -64,7 +59,8 @@ function ChartCtrl($scope) {
 
 
     // load the given chart
-    function loadChart(chartFn, queryResult) {
+    function loadChart(chartFn) {
+        result = $scope.selectedResult
         // Remove old chart
         // TODO: reload new query into old charts for efficiency; also
         // cache multiple chart types for quick navigation of most
@@ -73,7 +69,8 @@ function ChartCtrl($scope) {
             $scope.currChart.dispose();
         }
         $scope.currChart = new chartFn();*/
-        window.console.log("Loaded " + chartFn.chartName + " with result for " + result.query);
+        window.console.log("Loaded " + chartFn.chartName +
+                           " with result for " + result.query);
     }
 
     $scope.addChart(LineChart);
