@@ -1,15 +1,79 @@
+function mungeData(data, xColIdx, yColIdx) {
+    return data.map(function(item) {
+        return { 'x': item[xColIdx], 'y': item[yColIdx] };
+    });
+}
 
-function LineChart(width, height, target) {}
+function LineChart(target, queryResult) {
+
+    function getData(queryResult) {
+        xColIdx = firstTypeIdx(queryResult.columns, 'date')
+        yColIdx = firstTypeIdx(queryResult.columns, 'integer', 'float')
+
+        result = {
+            values: mungeData(queryResult.data, xColIdx, yColIdx),
+            key: "Sine Wave",
+            color: "#ff7f0e"
+        };
+
+        return [ result ];
+    }
+
+    // Wrapping in nv.addGraph allows for '0 timeout render',
+    // stores rendered charts in nv.graphs, and may do more
+    // in the future... it's NOT required
+    nv.addGraph(function() {  
+        var chart = nv.models.lineChart();
+
+        // chart sub-models (ie. xAxis, yAxis, etc) when
+        // accessed directly, return themselves, not the
+        // partent chart, so need to chain separately
+        chart.xAxis 
+            .tickFormat(function(d) { 
+                window.console.log("Got " + d);
+                return d3.time.format('%x') (new Date(d))
+            });
+
+        chart.yAxis
+            .axisLabel('Voltage (v)')
+            .tickFormat(d3.format(',.1f'));
+
+        d3.select(target)
+            .datum(getData(queryResult))
+            .transition().duration(500)
+            .call(chart);
+
+        //TODO: Figure out a good way to do this automatically
+        nv.utils.windowResize(chart.update);
+
+        return chart;
+    });
+
+    this.dispose = function() {
+        var ch = $(chartId).remove();
+        
+    }
+
+}
+
 LineChart.chartName = 'Line'
-LineChart.accepts = function(queryResult) { return true; }
+LineChart.accepts = function(queryResult) {
+    var cols = queryResult.columns;
+    return firstTypeIdx(cols, 'date') > -1 &&
+        firstTypeIdx(cols, 'integer', 'float') > -1;
+}
 
 function BarChart(width, height, target) {}
 BarChart.chartName = 'Bar'
-BarChart.accepts = function(queryResult) { return true; }
+BarChart.accepts = function(queryResult) { 
+    return queryResult.query.length < 15;
+}
 
 function Table(width, height, target) {}
 Table.chartName = 'Table'
-Table.accepts = function(queryResult) { return queryResult.query.length < 15; }
+Table.accepts = function(queryResult) {
+    return true;
+}
 
 /*function RootCtrl($scope) {
     $scope.$on('resultSelected', function(event, queryResult) {
@@ -25,11 +89,13 @@ function ChartCtrl($scope) {
 
     $scope.$on('resultSelected', function(event, queryResult) {
         $scope.selectedResult = queryResult;
-        // if the last selected chart supports this
-        // query result, reuse that; otherwise, reinitialize
-        if (!$scope.selectedChart || !$scope.selectedChart.accepts(queryResult)) {
-            // We assume that at least one chart will always be available
-            $scope.selectChart($scope.availableCharts()[0]);
+        if (queryResult) {
+            // if the last selected chart supports this
+            // query result, reuse that; otherwise, reinitialize
+            if (!$scope.selectedChart || !$scope.selectedChart.accepts(queryResult)) {
+                // We assume that at least one chart will always be available
+                $scope.selectChart($scope.availableCharts()[0]);
+            }
         }
     });
 
@@ -51,7 +117,9 @@ function ChartCtrl($scope) {
         if (chart) {
             window.console.log("selected " + chart.chartName);
             $scope.selectedChart = chart;
-            loadChart(chart);
+            if ($scope.selectedResult) {
+                loadChart(chart, $scope.selectedResult);
+            }
         } else {
             // error or something
         }
@@ -59,8 +127,8 @@ function ChartCtrl($scope) {
 
 
     // load the given chart
-    function loadChart(chartFn) {
-        result = $scope.selectedResult
+    function loadChart(chartFn, result) {
+        chartFn('#chart1 svg', result);
         // Remove old chart
         // TODO: reload new query into old charts for efficiency; also
         // cache multiple chart types for quick navigation of most
@@ -104,6 +172,22 @@ var results = [ {
     data: [ [ 123.234 /* for now, we'll just send dates as floats */ ] ]
 }, {
     id: 3,
+    query: 'select date, amount from invoice order by date',
+    runtime: 0.334,
+    columns: [ { name: 'date', type: 'date' }, { name: 'amount', type: 'float' } ],
+    data: [
+        [ 1025409600000, 123.2234 ],
+        [ 1025419600000, 93.2234 ],
+        [ 1025429600000, 103.2234 ],
+        [ 1025439600000, 113.2234 ],
+        [ 1025449600000, 124.2234 ],
+        [ 1025459600000, 120.2234 ],
+        [ 1025469600000, 111.2234 ],
+        [ 1025479600000, 97.2234 ],
+        [ 1025489600000, 83.2234 ]
+    ]
+}, {
+    id: 4,
     query: 'select g from generate_series(1,10) g',
     columns: [ { name: 'g', type: 'integer' } ],
     runtime: 0.082,
@@ -147,7 +231,11 @@ function QueryCtrl($scope) {
     }
 
     //results.forEach($scope.addResult);
-    setTimeout(function() { $scope.$apply(function() { results.forEach(($scope.addResult)); }) }, 100);
+    setTimeout(function() {
+        $scope.$apply(function() {
+            results.forEach($scope.addResult);
+        });
+    }, 100);
 }
 
 
@@ -162,6 +250,17 @@ function QueryCtrl($scope) {
   pivoting important, but v2
 
 */
+
+function firstTypeIdx(cols, ofType) {
+    for (var i = 0; i < cols.length; i++){
+        for (var j = 1; j < arguments.length; j++) {
+            if (cols[i].type == arguments[j]) {
+                return i;
+            }
+        }
+    }
+    return -1;
+}
 
 function isDistinct(data, field) {
     var values = {};
