@@ -28,7 +28,6 @@ function LineChart(target, queryResult) {
         // partent chart, so need to chain separately
         chart.xAxis 
             .tickFormat(function(d) { 
-                window.console.log("Got " + d);
                 return d3.time.format('%x') (new Date(d))
             });
 
@@ -77,7 +76,55 @@ BarChart.accepts = function(queryResult) {
     return queryResult.query.length < 15;
 }
 
-function Table(width, height, target) {}
+function Table(target, queryResult) {
+    function zpad(numstr, len) {
+        return numstr.length == len ? numstr : '0' + zpad(numstr, len - 1);
+    }
+    function formatDate(d) {
+        return d.getFullYear() + '-' +
+            zpad((d.getMonth() + 1).toString(), 2) + '-' +
+            zpad((d.getDate()).toString(), 2) + ' ' +
+            zpad((d.getHours()).toString(), 2) + ':' +
+            zpad((d.getMinutes()).toString(), 2) + ':' +
+            zpad((d.getSeconds()).toString(), 2) + '.' +
+            zpad((d.getMilliseconds()).toString(), 3);
+    }
+    
+    function toFixed(value, precision) {
+        var power = Math.pow(10, precision || 0);
+        return String(Math.round(value * power) / power);
+    }
+
+    function massageColumns(queryResult) {
+        return queryResult.columns.map(function(column) {
+            var tableColumn = {
+                "sTitle": column.name
+            };
+            if (isNumeric(column)) {
+                tableColumn.sClass = 'right-align';
+                tableColumn.fnRender = function(obj) {
+                    var result = obj.aData[obj.iDataColumn];
+                    return toFixed(result, column.type == 'integer' ? 0 : 3);
+                }
+            } else if (isDate(column)) {
+                tableColumn.fnRender = function(obj) {
+                    return formatDate(new Date(obj.aData[obj.iDataColumn]));
+                    //return 'oops';
+                }
+            }
+            return tableColumn;
+        });
+    }
+
+    var tableCount = 0;
+    tableId = 'table' + tableCount++;
+
+    $(target).append('<table class="display" id="' + tableId + '"></table>');
+    $('#' + tableId).dataTable({
+        "aaData": queryResult.data,
+        "aoColumns": massageColumns(queryResult)
+    });
+}
 Table.chartName = 'Table'
 Table.accepts = function(queryResult) {
     return true;
@@ -98,14 +145,19 @@ function ChartCtrl($scope) {
     $scope.$on('resultSelected', function(event, queryResult) {
         $scope.selectedResult = queryResult;
         if (queryResult) {
-            // if the last selected chart supports this
-            // query result, reuse that; otherwise, reinitialize
-            if (!$scope.selectedChart || !$scope.selectedChart.accepts(queryResult)) {
+            if (canReload(queryResult)) {
+                $scope.currChart.reload(queryResult);
+            } else {
                 // We assume that at least one chart will always be available
                 $scope.selectChart($scope.availableCharts()[0]);
             }
         }
     });
+
+    function canReload(queryResult) {
+        return $scope.selectedChart && $scope.selectedChart.accepts(queryResult) &&
+            typeof($scope.currChart.loadData) == 'function';
+    }
 
     $scope.availableCharts = function() {
         return $scope.registeredCharts.filter(function(chart) {
@@ -118,18 +170,10 @@ function ChartCtrl($scope) {
     }
 
     $scope.selectChart = function(chart) {
-        if ($scope.selectedChart && $scope.selectedChart == chart) {
-            return;
-        }
-        
-        if (chart) {
-            window.console.log("selected " + chart.chartName);
-            $scope.selectedChart = chart;
-            if ($scope.selectedResult) {
-                loadChart(chart, $scope.selectedResult);
-            }
-        } else {
-            // error or something
+        window.console.log("selected " + chart.chartName);
+        $scope.selectedChart = chart;
+        if ($scope.selectedResult) {
+            loadChart(chart, $scope.selectedResult);
         }
     }
 
@@ -144,7 +188,7 @@ function ChartCtrl($scope) {
             if (typeof($scope.currChart.dispose) == 'function') {
                 $scope.currChart.dispose();
             }
-            $('#chart-container').children().remove()
+            $('#chart-container').children().remove();
         }
         nextId  = 'chart' + chartId++;
         $('#chart-container').append('<div id="' + nextId + '">');
@@ -173,9 +217,9 @@ var results = [ {
         { name: 'col4', type: 'float' }
     ],
     data: [
-        [ 'a', 1, 'c', 2.3 ],
-        [ 'a', 1, 'c', 2.3 ],
-        [ 'a', 1, 'c', 2.3 ]
+        [ 'a', 1, 'c', 1232.323 ],
+        [ 'a', 1, 'c', 3322.311 ],
+        [ 'a', 1, 'c', 4232.338 ]
     ]
 }, {
     id: 2,
@@ -255,14 +299,25 @@ function QueryCtrl($scope) {
 /*
   charts
     - line/area/bar (distinct Date vs. Number+ | String + distinct Date vs. Number)
+      - clustered / stacked / 100-percent
+      - use point count as threshold between line/area and bar
     - scatter (Number vs. Number+ | String + Number vs. Number)
     - horizontal bar (String vs. Number+ | String + String vs. Number)
+      - clustered / stacked
     - pie (x, y) (String vs. Number, no more than five)
     - table (any) (could also get sparklines and shit in there)
 
   pivoting important, but v2
 
 */
+
+function isNumeric(column) {
+    return column.type == 'integer' || column.type == 'float';
+}
+
+function isDate(column) {
+    return column.type == 'date';
+}
 
 function firstTypeIdx(cols, ofType) {
     for (var i = 0; i < cols.length; i++){
