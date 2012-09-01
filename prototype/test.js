@@ -1,6 +1,6 @@
-function mungeData(data, xColIdx, yColIdx) {
+function remapData(data, xIdx, yIdx) {
     return data.map(function(item) {
-        return { 'x': item[xColIdx], 'y': item[yColIdx] };
+        return { 'x': item[xIdx], 'y': item[yIdx] };
     });
 }
 
@@ -11,7 +11,7 @@ function LineChart(target, queryResult) {
         yColIdx = firstTypeIdx(queryResult.columns, 'integer', 'float')
 
         result = {
-            values: mungeData(queryResult.data, xColIdx, yColIdx),
+            values: remapData(queryResult.data, xColIdx, yColIdx),
             key: "Sine Wave",
             color: "#ff7f0e"
         };
@@ -19,10 +19,8 @@ function LineChart(target, queryResult) {
         return [ result ];
     }
 
-    // Wrapping in nv.addGraph allows for '0 timeout render',
-    // stores rendered charts in nv.graphs, and may do more
-    // in the future... it's NOT required
-    nv.addGraph(function() {  
+    nv.addGraph(function() {
+        window.console.log("Adding line chart to " + target);
         var chart = nv.models.lineChart();
 
         // chart sub-models (ie. xAxis, yAxis, etc) when
@@ -38,20 +36,30 @@ function LineChart(target, queryResult) {
             .axisLabel('Voltage (v)')
             .tickFormat(d3.format(',.1f'));
 
-        d3.select(target)
+        $(target).append('<svg></svg>');
+
+        d3.select(target + ' svg')
             .datum(getData(queryResult))
             .transition().duration(500)
             .call(chart);
 
-        //TODO: Figure out a good way to do this automatically
+        //TODO: eventually nvd3 may do this automatically
         nv.utils.windowResize(chart.update);
+
+        this.nvd3chart = chart;
 
         return chart;
     });
 
     this.dispose = function() {
-        var ch = $(chartId).remove();
-        
+        // This is a little ugly right now because nvd3 does not allow
+        // for clean adding / removing of charts.
+        for (var i = 0; i < nv.graphs.length; i++) {
+            if (nv.graphs[i] = this.nvd3chart) {
+                nv.graphs.splice(index, 1);
+                break;
+            }
+        }
     }
 
 }
@@ -125,18 +133,23 @@ function ChartCtrl($scope) {
         }
     }
 
+    var chartId = 0;
 
     // load the given chart
     function loadChart(chartFn, result) {
-        chartFn('#chart1 svg', result);
-        // Remove old chart
         // TODO: reload new query into old charts for efficiency; also
         // cache multiple chart types for quick navigation of most
-        // recent items
-        /*if ($scope.currChart) {
-            $scope.currChart.dispose();
+        // recent items recent items
+        if ($scope.currChart) {
+            if (typeof($scope.currChart.dispose) == 'function') {
+                $scope.currChart.dispose();
+            }
+            $('#chart-container').children().remove()
         }
-        $scope.currChart = new chartFn();*/
+        nextId  = 'chart' + chartId++;
+        $('#chart-container').append('<div id="' + nextId + '">');
+        $scope.currChart = new chartFn('#' + nextId, result);
+
         window.console.log("Loaded " + chartFn.chartName +
                            " with result for " + result.query);
     }
