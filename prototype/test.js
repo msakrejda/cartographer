@@ -1,3 +1,18 @@
+function colorMaker() {
+    var i = 0;
+    var colors = [
+        '#CC9900',
+        '#CC0099',
+        '#CC00CC',
+    ];
+    return function() {
+        if (i >= colors.length) {
+            i = 0;
+        }
+        return colors[i++];
+    }
+}
+
 function remapData(data, xIdx, yIdx) {
     return data.map(function(item) {
         return { 'x': item[xIdx], 'y': item[yIdx] };
@@ -8,16 +23,20 @@ function LineChart(target, queryResult) {
 
     function getData(queryResult) {
         var cols = queryResult.columns;
-        xColIdx = first(cols, 'date')
-        yColIdx = first(cols, 'integer', 'float')
+        xColIdx = firstIdx(cols, 'date');
+        yColIdxs = allIdx(cols, 'integer', 'float');
 
-        result = {
-            values: remapData(queryResult.data, xColIdx, yColIdx),
-            key: cols[xColIdx].name + " vs " + cols[yColIdx].name,
-            color: "#ff7f0e"
-        };
-
-        return [ result ];
+        result = [];
+        colorFn = colorMaker();
+        for (var i = 0; i < yColIdxs.length; i++) {
+            var yColIdx = yColIdxs[i];
+            result.push({
+                values: remapData(queryResult.data, xColIdx, yColIdx),
+                key: cols[xColIdx].name + " vs " + cols[yColIdx].name,
+                color: colorFn()
+            });
+        }
+        return result;
     }
 
     nv.addGraph(function() {
@@ -72,18 +91,24 @@ LineChart.accepts = function(queryResult) {
 
 function BarChart(target, queryResult) {
 
+
     function getData(queryResult) {
         var cols = queryResult.columns;
-        xColIdx = first(cols, 'date', 'text')
-        yColIdx = first(cols, 'integer', 'float')
+        // TODO: support using text if date is there
+        xColIdx = firstIdx(cols, 'date', 'text');
+        yColIdxs = allIdx(cols, 'integer', 'float');
 
-        result = {
-            values: remapData(queryResult.data, xColIdx, yColIdx),
-            key: cols[xColIdx].name + " v. " + cols[yColIdx].name,
-            color: "#ff7f0e"
-        };
-
-        return [ result ];
+        result = [];
+        colorFn = colorMaker();
+        for (var i = 0; i < yColIdxs.length; i++) {
+            var yColIdx = yColIdxs[i];
+            result.push({
+                values: remapData(queryResult.data, xColIdx, yColIdx),
+                key: cols[xColIdx].name + " vs " + cols[yColIdx].name,
+                color: colorFn()
+            });
+        }
+        return result;
     }
 
     nv.addGraph(function() {
@@ -163,7 +188,6 @@ function Table(target, queryResult) {
             } else if (isDate(column)) {
                 tableColumn.fnRender = function(obj) {
                     return formatDate(new Date(obj.aData[obj.iDataColumn]));
-                    //return 'oops';
                 }
             }
             return tableColumn;
@@ -283,19 +307,21 @@ var results = [ {
     data: [ [ 123.234 /* for now, we'll just send dates as floats */ ] ]
 }, {
     id: 3,
-    query: 'select date, amount from invoice order by date',
+    query: 'select date, amount, other_amount from invoice order by date',
     runtime: 0.334,
-    columns: [ { name: 'date', type: 'date' }, { name: 'amount', type: 'float' } ],
+    columns: [ { name: 'timestamp', type: 'date' },
+               { name: 'amount', type: 'float' },
+               { name: 'other_amount', type: 'float' } ],
     data: [
-        [ 1025409600000, 123.2234 ],
-        [ 1025419600000, 93.2234 ],
-        [ 1025429600000, 103.2234 ],
-        [ 1025439600000, 113.2234 ],
-        [ 1025449600000, 124.2234 ],
-        [ 1025459600000, 120.2234 ],
-        [ 1025469600000, 111.2234 ],
-        [ 1025479600000, 97.2234 ],
-        [ 1025489600000, 83.2234 ]
+        [ 1025409600000, 123.2234, 153.22 ],
+        [ 1025419600000, 93.2234, 134.12 ],
+        [ 1025429600000, 103.2234, 113.98 ],
+        [ 1025439600000, 113.2234, 139.53 ],
+        [ 1025449600000, 124.2234, 160.06 ],
+        [ 1025459600000, 120.2234, 133.12 ],
+        [ 1025469600000, 111.2234, 140.09 ],
+        [ 1025479600000, 97.2234, 120.77 ],
+        [ 1025489600000, 83.2234, 132.63 ]
     ]
 }, {
     id: 4,
@@ -378,7 +404,25 @@ function QueryCtrl($scope) {
 
   pivoting important, but v2
 
+
+  metadata and data introspection:
+  - colCount('type')
+  - hasCol('type')
+  - first('type')
+  - isDistinct(colIdx)
+  - isOrdered(colIdx)
+
 */
+
+function getFormatter(column) {
+    return function(item) {
+        if (isDate(column)) {
+            //?
+        } else if (isNumeric(column)) {
+            //?
+        }
+    }
+}
 
 function isNumeric(column) {
     return column.type == 'integer' || column.type == 'float';
@@ -389,14 +433,14 @@ function isDate(column) {
 }
 function hasCol(cols, types) {
     for (var i = 1; i < arguments.length; i++) {
-        if (first(cols, arguments[i]) > -1) {
+        if (firstIdx(cols, arguments[i]) > -1) {
             return true;
         }
     }
     return false;
 }
 
-function first(cols, ofType) {
+function firstIdx(cols, ofType) {
     for (var i = 0; i < cols.length; i++){
         for (var j = 1; j < arguments.length; j++) {
             if (cols[i].type == arguments[j]) {
@@ -405,6 +449,20 @@ function first(cols, ofType) {
         }
     }
     return -1;
+}
+
+function allIdx(cols, ofType) {
+    var result = [];
+    for (var i = 0; i < cols.length; i++) {
+        for (var j = 1; j < arguments.length; j++) {
+            if (cols[i].type == arguments[j]) {
+                result.push(i);
+                // No point checking the other types for this col
+                continue;
+            }
+        }
+    }
+    return result;
 }
 
 function isDistinct(data, field) {
