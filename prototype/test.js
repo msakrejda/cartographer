@@ -7,12 +7,13 @@ function remapData(data, xIdx, yIdx) {
 function LineChart(target, queryResult) {
 
     function getData(queryResult) {
-        xColIdx = firstTypeIdx(queryResult.columns, 'date')
-        yColIdx = firstTypeIdx(queryResult.columns, 'integer', 'float')
+        var cols = queryResult.columns;
+        xColIdx = first(cols, 'date')
+        yColIdx = first(cols, 'integer', 'float')
 
         result = {
             values: remapData(queryResult.data, xColIdx, yColIdx),
-            key: "Sine Wave",
+            key: cols[xColIdx].name + " vs " + cols[yColIdx].name,
             color: "#ff7f0e"
         };
 
@@ -39,7 +40,7 @@ function LineChart(target, queryResult) {
 
         d3.select(target + ' svg')
             .datum(getData(queryResult))
-            .transition().duration(500)
+            .transition().duration(200)
             .call(chart);
 
         //TODO: eventually nvd3 may do this automatically
@@ -66,14 +67,72 @@ function LineChart(target, queryResult) {
 LineChart.chartName = 'Line'
 LineChart.accepts = function(queryResult) {
     var cols = queryResult.columns;
-    return firstTypeIdx(cols, 'date') > -1 &&
-        firstTypeIdx(cols, 'integer', 'float') > -1;
+    return hasCol(cols, 'date') && hasCol(cols, 'integer', 'float');
 }
 
-function BarChart(width, height, target) {}
+function BarChart(target, queryResult) {
+
+    function getData(queryResult) {
+        var cols = queryResult.columns;
+        xColIdx = first(cols, 'date', 'text')
+        yColIdx = first(cols, 'integer', 'float')
+
+        result = {
+            values: remapData(queryResult.data, xColIdx, yColIdx),
+            key: cols[xColIdx].name + " v. " + cols[yColIdx].name,
+            color: "#ff7f0e"
+        };
+
+        return [ result ];
+    }
+
+    nv.addGraph(function() {
+        window.console.log("Adding bar chart to " + target);
+
+        var chart = nv.models.multiBarChart();
+
+        if (hasCol(queryResult.columns, 'date')) {
+            chart.xAxis 
+                .tickFormat(function(d) { 
+                    return d3.time.format('%x') (new Date(d))
+                });
+        }
+
+        chart.yAxis
+            .axisLabel('Voltage (v)')
+            .tickFormat(d3.format(',.1f'));
+
+        $(target).append('<svg></svg>');
+
+        d3.select(target + ' svg')
+            .datum(getData(queryResult))
+            .transition().duration(200).call(chart);
+
+        nv.utils.windowResize(chart.update);
+
+        this.nvd3chart = chart;
+
+        return chart;
+    });
+
+
+    this.dispose = function() {
+        // This is a little ugly right now because nvd3 does not allow
+        // for clean adding / removing of charts.
+        for (var i = 0; i < nv.graphs.length; i++) {
+            if (nv.graphs[i] = this.nvd3chart) {
+                nv.graphs.splice(index, 1);
+                break;
+            }
+        }
+    }
+}
 BarChart.chartName = 'Bar'
 BarChart.accepts = function(queryResult) { 
-    return queryResult.query.length < 15;
+    var cols = queryResult.columns;
+    return queryResult.data.length < 15 &&
+        hasCol(cols, 'text', 'date') &&
+        hasCol(cols, 'integer', 'float');
 }
 
 function Table(target, queryResult) {
@@ -89,11 +148,6 @@ function Table(target, queryResult) {
             zpad((d.getSeconds()).toString(), 2) + '.' +
             zpad((d.getMilliseconds()).toString(), 3);
     }
-    
-    function toFixed(value, precision) {
-        var power = Math.pow(10, precision || 0);
-        return String(Math.round(value * power) / power);
-    }
 
     function massageColumns(queryResult) {
         return queryResult.columns.map(function(column) {
@@ -104,7 +158,7 @@ function Table(target, queryResult) {
                 tableColumn.sClass = 'right-align';
                 tableColumn.fnRender = function(obj) {
                     var result = obj.aData[obj.iDataColumn];
-                    return toFixed(result, column.type == 'integer' ? 0 : 3);
+                    return result.toFixed(column.type == 'integer' ? 0 : 3);
                 }
             } else if (isDate(column)) {
                 tableColumn.fnRender = function(obj) {
@@ -198,9 +252,9 @@ function ChartCtrl($scope) {
                            " with result for " + result.query);
     }
 
+    $scope.addChart(Table);
     $scope.addChart(LineChart);
     $scope.addChart(BarChart);
-    $scope.addChart(Table);
 }
 
 
@@ -217,9 +271,9 @@ var results = [ {
         { name: 'col4', type: 'float' }
     ],
     data: [
-        [ 'a', 1, 'c', 1232.323 ],
-        [ 'a', 1, 'c', 3322.311 ],
-        [ 'a', 1, 'c', 4232.338 ]
+        [ 'a', 12, 'c', 1232.323 ],
+        [ 'b', 144, 'd', 3322.311 ],
+        [ 'c', 19, 'e', 4232.338 ]
     ]
 }, {
     id: 2,
@@ -245,7 +299,7 @@ var results = [ {
     ]
 }, {
     id: 4,
-    query: 'select g from generate_series(1,10) g',
+    query: 'select g from generate_series(1,25) g',
     columns: [ { name: 'g', type: 'integer' } ],
     runtime: 0.082,
     data: [
@@ -258,7 +312,22 @@ var results = [ {
         [ 7 ],
         [ 8 ],
         [ 9 ],
-        [ 10 ]
+        [ 10 ],
+        [ 11 ],
+        [ 12 ],
+        [ 13 ],
+        [ 14 ],
+        [ 15 ],
+        [ 16 ],
+        [ 17 ],
+        [ 18 ],
+        [ 19 ],
+        [ 20 ],
+        [ 21 ],
+        [ 22 ],
+        [ 23 ],
+        [ 24 ],
+        [ 25 ]
     ]
 }];
 
@@ -318,8 +387,16 @@ function isNumeric(column) {
 function isDate(column) {
     return column.type == 'date';
 }
+function hasCol(cols, types) {
+    for (var i = 1; i < arguments.length; i++) {
+        if (first(cols, arguments[i]) > -1) {
+            return true;
+        }
+    }
+    return false;
+}
 
-function firstTypeIdx(cols, ofType) {
+function first(cols, ofType) {
     for (var i = 0; i < cols.length; i++){
         for (var j = 1; j < arguments.length; j++) {
             if (cols[i].type == arguments[j]) {
