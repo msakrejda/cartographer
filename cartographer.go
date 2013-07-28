@@ -3,9 +3,9 @@ package main
 import (
 	"bufio"
 	"crypto/tls"
+	"encoding/json"
 	"femebe"
 	"femebe/pgproto"
-	"fmt"
 	"io"
 	"log"
 	"net"
@@ -222,110 +222,136 @@ type SessionWatcher struct {
 	lastError *pgproto.ErrorResponse
 
 	activityCh chan string
+	nextEventId int
 }
 
-func NewSessionWatcher(activity chan string) {
+func NewSessionWatcher(activity chan string) *SessionWatcher {
 	return &SessionWatcher{activityCh: activity}
 }
 
 type Column struct {
-	colName string `json:"name"`
-	colType string `json:"type"`
+	ColName string `json:"name"`
+	ColType string `json:"type"`
 }
 
 type SessionEvent struct {
-	id int
-	query string
-	runtime float64
-	columns []*Column
-	data [][]interface{}
-	error string `json:omitempty`
+	Id int
+	Query string
+	Columns []*Column `json:omitempty`
+	Data [][]interface{} `json:omitempty`
+	Error map[string]string `json:omitempty`
 }
 
-// gross global state
-nextEventId int = 0
-
-func newSessionEvent(query *pgproto.Query, metadata *pgproto.RowDescription,
-	data []*pgproto.DataRow, error *pgproto.ErrorResponse) {
-	return &SessionEvent{
-		id: nextEventId++,
-		query: query.Query,
-		runtime
-		
+func (sw *SessionWatcher) generateSessionEvent() *SessionEvent {
+	if sw.lastQuery == nil {
+		log.Printf("%#v\n", sw)
 	}
-}
+	var cols []*Column
+	var data [][]interface{}
+	var errors map[string]string
+	if sw.lastMetadata != nil {
+		cols = make([]*Column, len(sw.lastMetadata.Fields))
+		for i, field := range sw.lastMetadata.Fields {
+			typeDescr := pgproto.DescribeType(field.TypeOid)
+			cols[i] = &Column{field.Name, typeDescr}
+		}
+		if sw.lastData != nil {
+			data = make([][]interface{}, len(sw.lastData))
+			for i, dataRow := range sw.lastData {
+				data[i] = make([]interface{}, len(cols))
+				for col, val := range dataRow.Values {
+					if val != nil {
+						data[i][col] = pgproto.Decode(val,
+							sw.lastMetadata.Fields[col].TypeOid)
+					}
+				}
+			}
+		}
+	}
+	if sw.lastError != nil {
+		errors = make(map[string]string)
+		for key, value := range sw.lastError.Details {
+			keyDescr := pgproto.DescribeStatusCode(key)
+			errors[keyDescr] = value
+		}
+	}
 
+	sw.nextEventId++
+	// create a new event
+	event := &SessionEvent{
+		Id: sw.nextEventId,
+		Query: sw.lastQuery.Query,
+		Columns: cols,
+		Data: data,
+		Error: errors,
+	}
+	// and flush state
+	sw.lastQuery = nil
+	sw.lastMetadata = nil
+	sw.lastData = make([]*pgproto.DataRow, 0)
+	sw.lastError = nil
+
+	return event
+}
 
 func (sw *SessionWatcher) onRequest(m *femebe.Message) {
-	msgJSON := toJSON(m)
-	if msgJSON != "" {
-		fmt.Printf("> %v\n", msgJSON)
-	}
+	log.Printf("< %c", m.MsgType())
 	switch t := m.MsgType(); t {
 	case 'Q':
 		q, err := pgproto.ReadQuery(m)
 		if err != nil {
-			sw.lastQuery = q
+			panic("Oh snap")
 		}
+		sw.lastQuery = q
 		// TODO: support extended query protocol
 	default:
 		// just ignore the message; it's not interesting for now
 	}
 }
 
-
-
 func (sw *SessionWatcher) onResponse(m *femebe.Message) {
-	msgJSON := toJSON(m)
-	if msgJSON != "" {
-		fmt.Printf("< %v\n", msgJSON)
-	}
+	log.Printf("< %c", m.MsgType())
 	switch t := m.MsgType(); t {
 	case 'C':
 		// command complete; encode and send off the current query
-		eventData = newSessionEvent(query, metadata, data, error)
-		sw.activityCh <- eventData
-
-		// and flush state
-		sw.lastQuery = nil
-		sw.lastMetada = nil
-		sw.lastData = nil
-		sw.lastError = nil
+		eventData := sw.generateSessionEvent()
+		eventStr, err := json.Marshal(eventData)
+		if err != nil {
+			panic("Oh snap")
+		}
+		sw.activityCh <- string(eventStr)
 	case 'B':
 		// error response
 		eresp, err := pgproto.ReadErrorResponse(m)
 		if err != nil {
-			sw.lastError = eresp
-		} else {
 			panic("Oh snap")
 		}
+		sw.lastError = eresp
 	case 'T':
 		desc, err := pgproto.ReadRowDescription(m)
 		if err != nil {
-			sw.metadata = desc
-		} else {
 			panic("Oh snap")
 		}
+		sw.lastMetadata = desc
 	case 'D':
 		datarow, err := pgproto.ReadDataRow(m)
 		if err != nil {
-			sw.data = append(sw.data, datarow)
-		} else {
 			panic("Oh snap")
 		}
+		sw.lastData = append(sw.lastData, datarow)
 	default:
 		// just ignore the message; it's not interesting for now
 	}
 }
 
-func messageListener(parser *ActivityParser, frontend chan *femebe.Message,
+func messageListener(sw *SessionWatcher, frontend chan *femebe.Message,
 	backend chan *femebe.Message) {
 	for {
 		select {
 		case m := <- frontend:
-			parser.onRequest(m)
+			sw.onRequest(m)
 		case m := <- backend:
-			parser.onResponse(m)
+			sw.onResponse(m)
 		}
 	}
 }
@@ -346,11 +372,18 @@ func main() {
 	}
 	targetaddr := os.Args[2]
 
-	var p ActivityParser
+	activityCh := make(chan string)
+	go func() {
+		for event := range activityCh {
+			log.Println(event)
+		}
+	}()
+	sw := NewSessionWatcher(activityCh)
+
 	frontend := make(chan *femebe.Message)
 	backend := make(chan *femebe.Message)
 
-	go messageListener(&p, frontend, backend);
+	go messageListener(sw, frontend, backend);
 
 	for {
 		conn, err := ln.Accept()
@@ -363,66 +396,6 @@ func main() {
 		go handleConnection(conn, targetaddr, frontend, backend)
 	}
 
-	log.Println("cartographer exits successfully")
+	log.Println("cartographer finished")
 	return
-}
-
-func toJSON(msg *femebe.Message) string {
-	msgFuncs := make(map[byte](func(*femebe.Message)string))
-
-	msgFuncs[pgproto.MSG_QUERY_Q] = func(msg *femebe.Message) string {
-		query, err := pgproto.ReadQuery(msg)
-		if err != nil {
-			panic("Oh snap!")
-		}
-		return "{ query: \"" + escape(query.Query) + "\"}"
-	}
-	msgFuncs[pgproto.MSG_ROW_DESCRIPTION_T] = func(msg *femebe.Message) string {
-		rowDescription, err := pgproto.ReadRowDescription(msg)
-		if err != nil {
-			panic("Oh snap!")
-		}
-		descr := "{ description: ["
-		for i, field := range rowDescription.Fields {
-			if i != 0 {
-				descr += ","
-			}
-			descr += "\"" +  escape(field.Name) + "\""
-		}
-
-		descr += "] }"
-
-		return descr
-	}
-	msgFuncs[pgproto.MSG_DATA_ROW_D] = func(msg *femebe.Message) string {
-		dat, err := pgproto.ReadDataRow(msg)
-		if err != nil {
-			panic("Oh snap!")
-		}
-		return fmt.Sprintf("{ data: %v }", dat.Values)
-	}
-	msgFuncs[pgproto.MSG_COMMAND_COMPLETE_C] = func(msg *femebe.Message) string {
-		cc, err := pgproto.ReadCommandComplete(msg)
-		if err != nil {
-			panic("Oh snap!")
-		}
-		return fmt.Sprintf("%v %v %v", cc.Tag, cc.AffectedCount, cc.Oid)
-	}
-
-
-
-
-	readFunc := msgFuncs[msg.MsgType()]
-	if readFunc != nil {
-		return fmt.Sprintf("%c %v", msg.MsgType(), readFunc(msg))
-	} else {
-		return fmt.Sprintf("%c", msg.MsgType())
-	}
-
-	panic("Oh snap")
-	//return fmt.Sprintf("%c", msg.MsgType())
-}
-
-func escape(str string) string {
-	return strings.Replace(str, "\"", "\\\"", -1)
 }
