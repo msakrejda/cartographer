@@ -211,10 +211,6 @@ func installSignalHandlers() {
 	}()
 }
 
-func oidToTypeName() {
-	
-}
-
 type SessionWatcher struct {
 	lastQuery *pgproto.Query
 	lastMetadata *pgproto.RowDescription
@@ -372,19 +368,6 @@ func main() {
 	}
 	targetaddr := os.Args[2]
 
-	activityCh := make(chan string)
-	go func() {
-		for event := range activityCh {
-			log.Println(event)
-		}
-	}()
-	sw := NewSessionWatcher(activityCh)
-
-	frontend := make(chan *femebe.Message)
-	backend := make(chan *femebe.Message)
-
-	go messageListener(sw, frontend, backend);
-
 	for {
 		conn, err := ln.Accept()
 
@@ -393,9 +376,20 @@ func main() {
 			continue
 		}
 
+		activityCh := make(chan string)
+		go func() {
+			for event := range activityCh {
+				log.Println(event)
+			}
+		}()
+		sw := NewSessionWatcher(activityCh)
+
+		frontend := make(chan *femebe.Message)
+		backend := make(chan *femebe.Message)
+
+		go messageListener(sw, frontend, backend);
 		go handleConnection(conn, targetaddr, frontend, backend)
 	}
 
 	log.Println("cartographer finished")
-	return
 }
