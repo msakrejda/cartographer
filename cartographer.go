@@ -49,7 +49,7 @@ type ProxyPair struct {
 	net.Conn
 }
 
-func NewMITMProxySession(errch chan error,
+func NewSniffingProxySession(errch chan error,
 	client *ProxyPair, server *ProxyPair,
 	frontend, backend chan *femebe.Message) *session {
 	mover := func(from, to *ProxyPair, msgStream chan *femebe.Message) func() {
@@ -133,7 +133,7 @@ func handleConnection(cConn net.Conn, destaddr string, frontend, backend chan *f
 
 	defer cConn.Close()
 
-	c := femebe.NewClientMessageStream(
+	c := femebe.NewFrontendMessageStream(
 		"Client", newBufWriteCon(cConn))
 
 	// Must interpret Startup and Cancel requests.
@@ -169,7 +169,7 @@ func handleConnection(cConn net.Conn, destaddr string, frontend, backend chan *f
 		return
 	}
 
-	s := femebe.NewServerMessageStream("Server", newBufWriteCon(sConn))
+	s := femebe.NewBackendMessageStream("Server", newBufWriteCon(sConn))
 	if err != nil {
 		log.Printf("Could not initialize connection to server: %v\n", err)
 		return
@@ -186,7 +186,7 @@ func handleConnection(cConn net.Conn, destaddr string, frontend, backend chan *f
 	}
 
 	done := make(chan error)
-	session := NewMITMProxySession(done,
+	session := NewSniffingProxySession(done,
 		&ProxyPair{c, cConn},
 		&ProxyPair{s, sConn},
 		frontend, backend)
