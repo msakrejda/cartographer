@@ -153,13 +153,9 @@ func main() {
 		}
 
 		activityCh := make(chan string)
-		go func() {
-			for event := range activityCh {
-				log.Println(event)
-			}
-		}()
-		sw := NewSessionWatcher(activityCh)
+		go drainActivity(activityCh)
 
+		sw := NewSessionWatcher(activityCh)
 		frontend := make(chan *femebe.Message)
 		backend := make(chan *femebe.Message)
 
@@ -168,4 +164,10 @@ func main() {
 	}
 
 	log.Println("cartographer finished")
+}
+
+func drainActivity(chan <- string) {
+	for event := range activityCh {
+		log.Println(event)
+	}
 }
