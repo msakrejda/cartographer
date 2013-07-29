@@ -19,7 +19,8 @@ Cartographer (it will be `go get`-able eventually).
 ```console
 $ git clone git@github.com:deafbybeheading/cartographer.git
 $ cd cartographer
-$ go run cartographer.go localhost:65432 /var/run/postgresql/.s.PGSQL.5434
+$ go get
+$ $GOROOT/bin/cartographer localhost:65432 /var/run/postgresql/.s.PGSQL.5434
 ```
 
 This will block. The first argument is the address Cartographer will
