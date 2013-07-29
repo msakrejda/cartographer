@@ -7,11 +7,19 @@ import (
 	"log"
 )
 
+var (
+	nextSessionId int
+)
+
 type SessionWatcher struct {
+	sessionId    int
 	lastQuery    *pgproto.Query
 	lastMetadata *pgproto.RowDescription
 	lastData     []*pgproto.DataRow
 	lastError    *pgproto.ErrorResponse
+
+	frontend chan *femebe.Message
+	backend  chan *femebe.Message
 
 	activity    chan string
 	nextEventId int
@@ -21,7 +29,12 @@ type SessionWatcher struct {
 // backend channels onto a single channel providing a simplified JSON
 // view of the activity
 func NewSessionWatcher(fe, be chan *femebe.Message, activity chan string) *SessionWatcher {
-	return &SessionWatcher{frontend: fe, backend: be, activity: activity}
+	nextSessionId++
+	return &SessionWatcher{sessionId: nextSessionId,
+		frontend: fe,
+		backend:  be,
+		activity: activity,
+	}
 }
 
 type Column struct {
