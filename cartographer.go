@@ -128,6 +128,29 @@ func installSignalHandlers() {
 	}()
 }
 
+type PGSessionState struct {
+	sessionId int
+	activity  chan string
+}
+
+type Proxy struct {
+	nextSessionId int
+	sessions      []*PGSessionState
+}
+
+func (p *Proxy) NewPGSession() *PGSessionState {
+	p.nextSessionId++
+	id := p.nextSessionId
+	activity := make(chan string)
+
+	session := &PGSessionState{id, activity}
+	// TODO: clear out sessions on disconnection
+	p.sessions = append(p.sessions, session)
+
+	go drainActivity(activity)
+	return session
+}
+
 // Startup and main client acceptance loop
 func main() {
 	installSignalHandlers()
@@ -144,30 +167,29 @@ func main() {
 	}
 	targetaddr := os.Args[2]
 
+	proxy := &Proxy{}
+
 	for {
 		conn, err := ln.Accept()
-
 		if err != nil {
 			log.Printf("Error: %v\n", err)
 			continue
 		}
+		session := proxy.NewPGSession()
 
-		activityCh := make(chan string)
-		go drainActivity(activityCh)
-
-		sw := NewSessionWatcher(activityCh)
 		frontend := make(chan *femebe.Message)
 		backend := make(chan *femebe.Message)
 
-		go messageListener(sw, frontend, backend);
+		sw := NewSessionWatcher(frontend, backend, session.activity)
+		go sw.listen()
 		go handleConnection(conn, targetaddr, frontend, backend)
 	}
 
 	log.Println("cartographer finished")
 }
 
-func drainActivity(chan <- string) {
-	for event := range activityCh {
+func drainActivity(activity <-chan string) {
+	for event := range activity {
 		log.Println(event)
 	}
 }

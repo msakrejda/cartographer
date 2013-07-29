@@ -8,17 +8,20 @@ import (
 )
 
 type SessionWatcher struct {
-	lastQuery *pgproto.Query
+	lastQuery    *pgproto.Query
 	lastMetadata *pgproto.RowDescription
-	lastData []*pgproto.DataRow
-	lastError *pgproto.ErrorResponse
+	lastData     []*pgproto.DataRow
+	lastError    *pgproto.ErrorResponse
 
-	activityCh chan string
+	activity    chan string
 	nextEventId int
 }
 
-func NewSessionWatcher(activity chan string) *SessionWatcher {
-	return &SessionWatcher{activityCh: activity}
+// Relay the protocol message flow activity from the two frontend and
+// backend channels onto a single channel providing a simplified JSON
+// view of the activity
+func NewSessionWatcher(fe, be chan *femebe.Message, activity chan string) *SessionWatcher {
+	return &SessionWatcher{frontend: fe, backend: be, activity: activity}
 }
 
 type Column struct {
@@ -27,11 +30,11 @@ type Column struct {
 }
 
 type SessionEvent struct {
-	Id int
-	Query string
-	Columns []*Column `json:omitempty`
-	Data [][]interface{} `json:omitempty`
-	Error map[string]string `json:omitempty`
+	Id      int
+	Query   string
+	Columns []*Column         `json:omitempty`
+	Data    [][]interface{}   `json:omitempty`
+	Error   map[string]string `json:omitempty`
 }
 
 func (sw *SessionWatcher) generateSessionEvent() *SessionEvent {
@@ -71,11 +74,11 @@ func (sw *SessionWatcher) generateSessionEvent() *SessionEvent {
 	sw.nextEventId++
 	// create a new event
 	event := &SessionEvent{
-		Id: sw.nextEventId,
-		Query: sw.lastQuery.Query,
+		Id:      sw.nextEventId,
+		Query:   sw.lastQuery.Query,
 		Columns: cols,
-		Data: data,
-		Error: errors,
+		Data:    data,
+		Error:   errors,
 	}
 	// and flush state
 	sw.lastQuery = nil
@@ -111,7 +114,7 @@ func (sw *SessionWatcher) onResponse(m *femebe.Message) {
 		if err != nil {
 			panic("Oh snap")
 		}
-		sw.activityCh <- string(eventStr)
+		sw.activity <- string(eventStr)
 	case 'B':
 		// error response
 		eresp, err := pgproto.ReadErrorResponse(m)
@@ -136,13 +139,12 @@ func (sw *SessionWatcher) onResponse(m *femebe.Message) {
 	}
 }
 
-func messageListener(sw *SessionWatcher, frontend chan *femebe.Message,
-	backend chan *femebe.Message) {
+func (sw *SessionWatcher) listen() {
 	for {
 		select {
-		case m := <- frontend:
+		case m := <-sw.frontend:
 			sw.onRequest(m)
-		case m := <- backend:
+		case m := <-sw.backend:
 			sw.onResponse(m)
 		}
 	}
