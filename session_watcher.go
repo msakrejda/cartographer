@@ -52,9 +52,6 @@ type SessionEvent struct {
 }
 
 func (sw *SessionWatcher) generateSessionEvent() *SessionEvent {
-	if sw.lastQuery == nil {
-		log.Printf("%#v\n", sw)
-	}
 	var cols []*Column
 	var data [][]interface{}
 	var errors map[string]string
