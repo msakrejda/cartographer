@@ -43,11 +43,12 @@ type Column struct {
 }
 
 type SessionEvent struct {
-	Id      int
-	Query   string
-	Columns []*Column         `json:omitempty`
-	Data    [][]interface{}   `json:omitempty`
-	Error   map[string]string `json:omitempty`
+	SessionId int               `json:"session_id"`
+	Id        int               `json:"id"`
+	Query     string            `json:"query"`
+	Columns   []*Column         `json:"columns,omitempty"`
+	Data      [][]interface{}   `json:"data,omitempty"`
+	Error     map[string]string `json:"error,omitempty"`
 }
 
 func (sw *SessionWatcher) generateSessionEvent() *SessionEvent {
@@ -87,11 +88,12 @@ func (sw *SessionWatcher) generateSessionEvent() *SessionEvent {
 	sw.nextEventId++
 	// create a new event
 	event := &SessionEvent{
-		Id:      sw.nextEventId,
-		Query:   sw.lastQuery.Query,
-		Columns: cols,
-		Data:    data,
-		Error:   errors,
+		SessionId: sw.sessionId,
+		Id:        sw.nextEventId,
+		Query:     sw.lastQuery.Query,
+		Columns:   cols,
+		Data:      data,
+		Error:     errors,
 	}
 	// and flush state
 	sw.lastQuery = nil
