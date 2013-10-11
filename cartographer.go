@@ -1,116 +1,90 @@
 package main
 
 import (
-	"crypto/tls"
-	"femebe"
-	"femebe/pgproto"
+	"fmt"
+	"github.com/deafbybeheading/femebe"
+	"github.com/deafbybeheading/femebe/core"
+	"github.com/deafbybeheading/femebe/proto"
+	"github.com/deafbybeheading/femebe/util"
 	"io"
 	"log"
 	"net"
 	"os"
 	"os/signal"
-	"strings"
 )
 
-// Automatically chooses between unix sockets and tcp sockets for
-// listening
-func autoListen(place string) (net.Listener, error) {
-	if strings.Contains(place, "/") {
-		return net.Listen("unix", place)
-	}
-
-	return net.Listen("tcp", place)
+type proxy struct {
+	resolver femebe.Resolver
+	manager  femebe.SessionManager
+	frontend chan *core.Message
+	backend  chan *core.Message
 }
 
-// Automatically chooses between unix sockets and tcp sockets for
-// dialing.
-func autoDial(place string) (net.Conn, error) {
-	if strings.Contains(place, "/") {
-		return net.Dial("unix", place)
-	}
+type fixedResolver struct {
+	targetAddr string
+}
 
-	return net.Dial("tcp", place)
+func (pr *fixedResolver) Resolve(params map[string]string) femebe.Connector {
+	return femebe.NewSimpleConnector(pr.targetAddr, params)
 }
 
 // Generic connection handler
 //
 // This redelegates to more specific proxy handlers that contain the
 // main proxy loop logic.
-func handleConnection(cConn net.Conn, destaddr string, frontend, backend chan *femebe.Message) {
+func (p *proxy) handleConnection(cConn net.Conn) {
+	defer cConn.Close()
 	var err error
-
 	// Log disconnections
 	defer func() {
-		if err != nil && err != io.EOF {
-			log.Printf("Session exits with error: %v\n", err)
+		if pn := recover(); pn != nil {
+			fmt.Printf("error in handling connection: %v", pn)
+			cConn.Close()
 		} else {
-			log.Printf("Session exits cleanly\n")
+			if err != nil && err != io.EOF {
+				log.Print("Session exits with error: ", err)
+			} else {
+				log.Print("Session exits cleanly")
+			}
 		}
 	}()
 
-	defer cConn.Close()
-
-	c := femebe.NewFrontendMessageStream(
-		"Client", newBufWriteCon(cConn))
-
-	// Must interpret Startup and Cancel requests.
-	//
-	// SSL Negotiation requests not handled for now.
-	var firstPacket femebe.Message
-	c.Next(&firstPacket)
-
-	// Handle Startup packets
-	var sup *pgproto.Startup
-	if sup, err = pgproto.ReadStartupMessage(&firstPacket); err != nil {
-		log.Print(err)
-		return
-	}
-	log.Print("Accept connection with startup message:")
-	for key, value := range sup.Params {
-		log.Printf("\t%s: %s\n", key, value)
-	}
-
-	unencryptServerConn, err := autoDial(destaddr)
+	feStream := core.NewFrontendStream(util.NewBufferedReadWriteCloser(cConn))
+	var m core.Message
+	err = feStream.Next(&m)
 	if err != nil {
-		log.Printf("Could not connect to server: %v\n", err)
-		return
+		panic(fmt.Errorf("could not read client startup message: %v", err))
 	}
-
-	tlsConf := tls.Config{}
-	tlsConf.InsecureSkipVerify = true
-
-	sConn, err := femebe.NegotiateTLS(
-		unencryptServerConn, "prefer", &tlsConf)
-	if err != nil {
-		log.Printf("Could not negotiate TLS: %v\n", err)
-		return
+	if proto.IsStartupMessage(&m) {
+		startup, err := proto.ReadStartupMessage(&m)
+		if err != nil {
+			panic(fmt.Errorf("could not parse client startup message: %v", err))
+		}
+		log.Print("Accept connection with startup message:")
+		connector := p.resolver.Resolve(startup.Params)
+		beStream, err := connector.Startup()
+		if err != nil {
+			panic(fmt.Errorf("could not connect to backend: %v", err))
+		}
+		router := NewSniffingRouter(feStream, beStream, p.frontend, p.backend)
+		session := femebe.NewSimpleSession(router, connector)
+		err = p.manager.RunSession(session)
+	} else if proto.IsCancelRequest(&m) {
+		cancel, err := proto.ReadCancelRequest(&m)
+		if err != nil {
+			panic(fmt.Errorf("could not parse cancel message: %v", err))
+		}
+		err = p.manager.Cancel(cancel.BackendPid, cancel.SecretKey)
+		if err != nil {
+			panic(fmt.Errorf("could not process cancellation: %v", err))
+		}
+		err = cConn.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+	} else {
+		panic(fmt.Errorf("could not understand client"))
 	}
-
-	s := femebe.NewBackendMessageStream("Server", newBufWriteCon(sConn))
-	if err != nil {
-		log.Printf("Could not initialize connection to server: %v\n", err)
-		return
-	}
-
-	err = s.Send(&firstPacket)
-	if err != nil {
-		return
-	}
-
-	err = s.Flush()
-	if err != nil {
-		return
-	}
-
-	done := make(chan error)
-	session := NewSniffingProxySession(done,
-		&ProxyPair{c, cConn},
-		&ProxyPair{s, sConn},
-		frontend, backend)
-	session.start()
-	// Both sides must exit to finish
-	_ = <-done
-	_ = <-done
 }
 
 func installSignalHandlers() {
@@ -137,12 +111,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	ln, err := autoListen(os.Args[1])
+	ln, err := util.AutoListen(os.Args[1])
 	if err != nil {
 		log.Printf("Could not listen on address: %v", err)
 		os.Exit(1)
 	}
-	targetaddr := os.Args[2]
 
 	activity := make(chan string)
 	web := NewWebRelay(activity)
@@ -156,12 +129,18 @@ func main() {
 			continue
 		}
 
-		frontend := make(chan *femebe.Message)
-		backend := make(chan *femebe.Message)
+		target := os.Args[2]
+		resolver := &fixedResolver{target}
+		manager := femebe.NewSimpleSessionManager()
+
+		frontend := make(chan *core.Message)
+		backend := make(chan *core.Message)
+
+		p := &proxy{resolver, manager, frontend, backend}
 
 		sw := NewSessionWatcher(frontend, backend, activity)
 		go sw.listen()
-		go handleConnection(conn, targetaddr, frontend, backend)
+		go p.handleConnection(conn)
 	}
 
 	log.Println("cartographer finished")

@@ -2,8 +2,9 @@ package main
 
 import (
 	"encoding/json"
-	"femebe"
-	"femebe/pgproto"
+	"github.com/deafbybeheading/femebe/codec"
+	"github.com/deafbybeheading/femebe/core"
+	"github.com/deafbybeheading/femebe/proto"
 	"log"
 )
 
@@ -13,13 +14,13 @@ var (
 
 type SessionWatcher struct {
 	sessionId    int
-	lastQuery    *pgproto.Query
-	lastMetadata *pgproto.RowDescription
-	lastData     []*pgproto.DataRow
-	lastError    *pgproto.ErrorResponse
+	lastQuery    *proto.Query
+	lastMetadata *proto.RowDescription
+	lastData     []*proto.DataRow
+	lastError    *proto.ErrorResponse
 
-	frontend chan *femebe.Message
-	backend  chan *femebe.Message
+	frontend chan *core.Message
+	backend  chan *core.Message
 
 	activity    chan string
 	nextEventId int
@@ -28,7 +29,7 @@ type SessionWatcher struct {
 // Relay the protocol message flow activity from the two frontend and
 // backend channels onto a single channel providing a simplified JSON
 // view of the activity
-func NewSessionWatcher(fe, be chan *femebe.Message, activity chan string) *SessionWatcher {
+func NewSessionWatcher(fe, be chan *core.Message, activity chan string) *SessionWatcher {
 	nextSessionId++
 	return &SessionWatcher{sessionId: nextSessionId,
 		frontend: fe,
@@ -58,7 +59,7 @@ func (sw *SessionWatcher) generateSessionEvent() *SessionEvent {
 	if sw.lastMetadata != nil {
 		cols = make([]*Column, len(sw.lastMetadata.Fields))
 		for i, field := range sw.lastMetadata.Fields {
-			typeDescr := pgproto.DescribeType(field.TypeOid)
+			typeDescr := codec.DescribeType(field.TypeOid)
 			cols[i] = &Column{field.Name, typeDescr}
 		}
 		if sw.lastData != nil {
@@ -67,7 +68,7 @@ func (sw *SessionWatcher) generateSessionEvent() *SessionEvent {
 				data[i] = make([]interface{}, len(cols))
 				for col, val := range dataRow.Values {
 					if val != nil {
-						data[i][col] = pgproto.Decode(val,
+						data[i][col] = codec.Decode(val,
 							sw.lastMetadata.Fields[col].TypeOid)
 					}
 				}
@@ -77,7 +78,7 @@ func (sw *SessionWatcher) generateSessionEvent() *SessionEvent {
 	if sw.lastError != nil {
 		errors = make(map[string]string)
 		for key, value := range sw.lastError.Details {
-			keyDescr := pgproto.DescribeStatusCode(key)
+			keyDescr := proto.DescribeStatusCode(key)
 			errors[keyDescr] = value
 		}
 	}
@@ -95,17 +96,17 @@ func (sw *SessionWatcher) generateSessionEvent() *SessionEvent {
 	// and flush state
 	sw.lastQuery = nil
 	sw.lastMetadata = nil
-	sw.lastData = make([]*pgproto.DataRow, 0)
+	sw.lastData = make([]*proto.DataRow, 0)
 	sw.lastError = nil
 
 	return event
 }
 
-func (sw *SessionWatcher) onRequest(m *femebe.Message) {
+func (sw *SessionWatcher) onRequest(m *core.Message) {
 	log.Printf("< %c", m.MsgType())
 	switch t := m.MsgType(); t {
 	case 'Q':
-		q, err := pgproto.ReadQuery(m)
+		q, err := proto.ReadQuery(m)
 		if err != nil {
 			panic("Oh snap")
 		}
@@ -116,7 +117,7 @@ func (sw *SessionWatcher) onRequest(m *femebe.Message) {
 	}
 }
 
-func (sw *SessionWatcher) onResponse(m *femebe.Message) {
+func (sw *SessionWatcher) onResponse(m *core.Message) {
 	log.Printf("< %c", m.MsgType())
 	switch t := m.MsgType(); t {
 	case 'C':
@@ -129,19 +130,19 @@ func (sw *SessionWatcher) onResponse(m *femebe.Message) {
 		sw.activity <- string(eventStr)
 	case 'B':
 		// error response
-		eresp, err := pgproto.ReadErrorResponse(m)
+		eresp, err := proto.ReadErrorResponse(m)
 		if err != nil {
 			panic("Oh snap")
 		}
 		sw.lastError = eresp
 	case 'T':
-		desc, err := pgproto.ReadRowDescription(m)
+		desc, err := proto.ReadRowDescription(m)
 		if err != nil {
 			panic("Oh snap")
 		}
 		sw.lastMetadata = desc
 	case 'D':
-		datarow, err := pgproto.ReadDataRow(m)
+		datarow, err := proto.ReadDataRow(m)
 		if err != nil {
 			panic("Oh snap")
 		}

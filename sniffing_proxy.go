@@ -1,89 +1,84 @@
 package main
 
 import (
-	"bufio"
-	"femebe"
-	"io"
-	"net"
+	"github.com/deafbybeheading/femebe"
+	"github.com/deafbybeheading/femebe/core"
+	"github.com/deafbybeheading/femebe/proto"
 )
 
-type session struct {
-	ingress func()
-	egress  func()
+type sniffingRouter struct {
+	backendPid uint32
+	secretKey  uint32
+	fe         core.Stream
+	be         core.Stream
+	feBuf      core.Message
+	beBuf      core.Message
+	feCh       chan<- *core.Message
+	beCh       chan<- *core.Message
 }
 
-func (s *session) start() {
-	go s.ingress()
-	go s.egress()
+// Make a new Router that copies all messages on the given streams to
+// the provided channels
+func NewSniffingRouter(fe, be core.Stream, feCh, beCh chan<- *core.Message) femebe.Router {
+	return &sniffingRouter{
+		backendPid: 0,
+		secretKey:  0,
+		fe:         fe,
+		be:         be,
+		feCh:       feCh,
+		beCh:       beCh,
+	}
 }
 
-type ProxyPair struct {
-	*femebe.MessageStream
-	net.Conn
+func (s *sniffingRouter) BackendKeyData() (uint32, uint32) {
+	return s.backendPid, s.secretKey
 }
 
-func NewSniffingProxySession(errch chan error,
-	client *ProxyPair, server *ProxyPair,
-	frontend, backend chan *femebe.Message) *session {
-	mover := func(from, to *ProxyPair, msgStream chan *femebe.Message) func() {
-		return func() {
-			var err error
+func (s *sniffingRouter) RouteFrontend() (err error) {
+	// route the next message from frontend to backend,
+	// blocking and flushing if necessary
+	err = s.fe.Next(&s.feBuf)
+	if err != nil {
+		return
+	}
 
-			defer func() {
-				from.Close()
-				to.Close()
-				errch <- err
-			}()
+	var clone core.Message
+	clone.InitFromMessage(&s.feBuf)
+	s.feCh <- &clone
 
-			var m femebe.Message
+	err = s.be.Send(&s.feBuf)
+	if err != nil {
+		return
+	}
+	if !s.fe.HasNext() {
+		return s.be.Flush()
+	}
+	return
+}
 
-			for {
-				err = from.Next(&m)
-				if err != nil {
-					return
-				}
-
-				// N.B.: the clone must be
-				// instantiated in the inner loop,
-				// since the msgStream side channel
-				// may not be done with the previous
-				// clone yet by the time we get around
-				// to cloning the next message (if we
-				// instantiate the clone outside the
-				// loop, we scribble all over the
-				// previous clone)
-				var clone femebe.Message
-				clone.InitFromMessage(&m)
-				msgStream <- &clone
-
-				err = to.Send(&m)
-				if err != nil {
-					return
-				}
-
-				if !from.HasNext() {
-					err = to.Flush()
-					if err != nil {
-						return
-					}
-				}
-			}
+func (s *sniffingRouter) RouteBackend() error {
+	// route the next message from backend to frotnend,
+	// blocking and flushing if necessary
+	err := s.be.Next(&s.beBuf)
+	if err != nil {
+		return err
+	}
+	if proto.IsBackendKeyData(&s.beBuf) {
+		beInfo, err := proto.ReadBackendKeyData(&s.beBuf)
+		if err != nil {
+			return err
 		}
+		s.backendPid = beInfo.BackendPid
+		s.secretKey = beInfo.SecretKey
 	}
 
-	return &session{
-		ingress: mover(client, server, frontend),
-		egress:  mover(server, client, backend),
+	var clone core.Message
+	clone.InitFromMessage(&s.beBuf)
+	s.beCh <- &clone
+
+	err = s.fe.Send(&s.beBuf)
+	if !s.be.HasNext() {
+		return s.fe.Flush()
 	}
-}
-
-type bufWriteCon struct {
-	io.ReadCloser
-	femebe.Flusher
-	io.Writer
-}
-
-func newBufWriteCon(c net.Conn) *bufWriteCon {
-	bw := bufio.NewWriter(c)
-	return &bufWriteCon{c, bw, bw}
+	return nil
 }
