@@ -22,17 +22,17 @@ func NewWebRelay(activity <-chan string) *WebRelay {
 
 // Relay activity messages to all connected clients
 func (w *WebRelay) Relay() {
-	for message := range w.activity {
-		w.relayMessage(message)
+	for proto := range w.activity {
+		w.relayMessage(proto)
 	}
 }
 
-func (w *WebRelay) relayMessage(message string) {
-	log.Println(message)
+func (w *WebRelay) relayMessage(proto string) {
+	log.Println(proto)
 	w.connLock.Lock()
 	defer w.connLock.Unlock()
 	for i, client := range w.clients {
-		err := websocket.Message.Send(client, message)
+		err := websocket.Message.Send(client, proto)
 		if err != nil {
 			client.Close()
 			copy(w.clients[i:], w.clients[i+1:])
