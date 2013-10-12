@@ -32,7 +32,15 @@
     });
 
     if (window["WebSocket"]) {
-        conn = new WebSocket("ws://{{$}}/connect");
+        var loc = window.location, wsUrl;
+        if (loc.protocol === "https:") {
+            wsUrl = "wss:";
+        } else {
+            wsUrl = "ws:";
+        }
+        wsUrl += "//" + loc.host + "/connect";
+
+        conn = new WebSocket(wsUrl);
         conn.onclose = function(evt) {
             appendLog($("<div><b>Connection closed.</b></div>"))
         }
