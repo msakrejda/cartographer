@@ -3,7 +3,6 @@ package main
 import (
 	"code.google.com/p/go.net/websocket"
 	"fmt"
-	"github.com/cyberdelia/pat"
 	"log"
 	"net/http"
 	"sync"
@@ -54,12 +53,9 @@ func (w *WebRelay) listenHttp(port int) {
 	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
 		http.Redirect(res, req, "cartographer", http.StatusFound)
 	})
-
-	r := pat.New()
-	r.Get("/connect", websocket.Handler(w.handleNewClient))
-	r.Get("/", http.FileServer(http.Dir("public")))
-
-	http.Handle("/cartographer/", http.StripPrefix("/cartographer", r))
+	http.Handle("/cartographer/connect", websocket.Handler(w.handleNewClient))
+	http.Handle("/cartographer/", http.StripPrefix("/cartographer",
+		http.FileServer(http.Dir("public/"))))
 
 	log.Printf("listening for http requests on %v...\n", port)
 	err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
