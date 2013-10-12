@@ -66,7 +66,7 @@ func (w *WebRelay) listenHttp(port int) {
 }
 
 var (
-	indexTmpl = template.Must(template.ParseFiles("index.html"))
+	indexTmpl = template.Must(template.ParseFiles("web/templates/index.html"))
 )
 
 func handleGetRoot(res http.ResponseWriter, req *http.Request) {
