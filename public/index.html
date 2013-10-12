@@ -38,7 +38,7 @@
         } else {
             wsUrl = "ws:";
         }
-        wsUrl += "//" + loc.host + "/connect";
+        wsUrl += "//" + loc.host + loc.pathname + "connect";
 
         conn = new WebSocket(wsUrl);
         conn.onclose = function(evt) {

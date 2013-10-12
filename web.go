@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"sync"
-	"text/template"
 )
 
 type WebRelay struct {
@@ -52,23 +51,19 @@ func (w *WebRelay) handleNewClient(ws *websocket.Conn) {
 }
 
 func (w *WebRelay) listenHttp(port int) {
+	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
+		http.Redirect(res, req, "cartographer", http.StatusFound)
+	})
+
 	r := pat.New()
 	r.Get("/connect", websocket.Handler(w.handleNewClient))
-	r.GetFunc("/", handleGetRoot)
+	r.Get("/", http.FileServer(http.Dir("public")))
 
-	http.Handle("/", r)
+	http.Handle("/cartographer/", http.StripPrefix("/cartographer", r))
 
 	log.Printf("listening for http requests on %v...\n", port)
 	err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 	if err != nil {
 		panic(err)
 	}
-}
-
-var (
-	indexTmpl = template.Must(template.ParseFiles("web/templates/index.html"))
-)
-
-func handleGetRoot(res http.ResponseWriter, req *http.Request) {
-	indexTmpl.Execute(res, req.Host)
 }
