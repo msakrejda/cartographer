@@ -1,34 +1,92 @@
-html {
-    overflow: hidden;
+td.right-align {
+    text-align:right;
 }
 
 body {
-    overflow: hidden;
-    padding: 0;
-    margin: 0;
-    width: 100%;
-    height: 100%;
-    background: gray;
+    overflow-y:scroll;
 }
 
-#log {
-    background: white;
-    margin: 0;
-    padding: 0.5em 0.5em 0.5em 0.5em;
-    position: absolute;
-    top: 0.5em;
-    left: 0.5em;
-    right: 0.5em;
-    bottom: 3em;
-    overflow: auto;
+text {
+    font: 12px sans-serif;
 }
 
-#form {
-    padding: 0 0.5em 0 0.5em;
-    margin: 0;
-    position: absolute;
-    bottom: 1em;
-    left: 0px;
-    width: 100%;
-    overflow: hidden;
+svg {
+    display: block;
 }
+
+#chart-container {
+    height: 600px;
+    width: 800px;
+    min-width: 100px;
+    min-height: 100px;
+}
+
+
+ul.resultList {
+    list-style-type:none;width:200px
+}
+
+li.result {
+    background-color:#CCCCCC;
+    position:relative;
+    padding-bottom:20px;
+    margin-bottom:20px;
+    padding-top:5px;
+    padding-left:5px;
+    padding-right:10px
+}
+
+li.selectedResult {
+    background-color: #8FACB3;
+    border-width: 1px;
+    border-style: solid;
+}
+
+.queryId {
+    float:left;
+    font-size:10px;
+}
+
+.queryText {
+    clear:both;
+    margin-left:5px;
+    font-family:monospace;
+}
+
+.queryFilter {
+    font-size:10px
+}
+
+.queryResultCount {
+    position:absolute;
+    right:0;
+    bottom:0;
+    font-size:10px;
+    padding-right:10px
+}
+
+.chartBox {
+    float:left
+}
+
+.chartList {
+    list-style-type:none;
+    margin:0;
+    padding:0;
+    height:80px
+}
+
+.chartOption {
+    float:left;
+    width:100px;
+    display:block;
+    background-color: #CCCCCC;
+    text-align:center;
+}
+
+li.selectedChart {
+    background-color: #B3968F;
+    border-width:1px;
+    border-style:solid;
+}
+

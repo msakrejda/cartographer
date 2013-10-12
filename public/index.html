@@ -1,16 +1,53 @@
-<html>
+<html ng-app="app">
   <head>
     <title>cartographer dataflow prototype</title>
-    <!-- shamelessly lifted from gary.beagledreams.com/go/websocket-example -->
-    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
-    <script type="text/javascript" src="assets/javascripts/connect.js"></script>
     <link href="assets/css/base.css" rel="stylesheet" type="text/css"></link>
+    <script type="text/javascript" src="vendor/jquery/jquery-2.0.3.min.js"></script>
+    <!--    <script type="text/javascript" src="assets/javascripts/connect.js"></script>-->
+    <script type="text/javascript" src="vendor/angular/angular.js"></script>
+    <script type="text/javascript">
+      var myAppModule = angular.module('app', []);
+    </script>
+    <script type="text/javascript" src="assets/javascripts/services.js"></script>
+    <script type="text/javascript" src="assets/javascripts/controllers.js"></script>
   </head>
-  <body>
-    <div id="log"></div>
-    <form id="form">
-      <input type="submit" value="Send" />
-      <input type="text" id="msg" size="64"/>
-    </form>
+  <body ng-controller="QueryCtrl">
+    <div style="width:100%">
+      <div style="width:300px;float:left">
+        <h3>Queries</h3>
+        <p class="queryFilter">
+          Filter:<input ng-model="search"></input>
+        </p>
+        <ul class="resultList">
+          <li class="result"
+              ng-repeat="result in results | filter:search"
+              ng-class="{ selectedResult: result == selectedResult }"
+              ng-click="selectResult(result)">
+            <span class="queryId">
+              #{{result.id}}
+            </span>
+            <p class="queryText">
+              {{result.query}}
+            </p>
+            <p class="queryResultCount">
+              (<ng-pluralize count="result.data.length" when="resultForms">
+              </ng-pluralize>)
+            </p>
+          </li>
+        </ul>
+      </div>
+<!--      <div class="chartBox"style="" ng-controller="ChartCtrl">
+        <ul class="chartList">
+          <li class="chartOption"
+              ng-repeat="chart in availableCharts()"
+              ng-class="{ selectedChart: chart == selectedChart }"
+              ng-click="selectChart(chart)">
+            {{chart.chartName}}
+          </li>
+        </ul>
+        <div id="chart-container">
+        </div>
+      </div>-->
+    </div>
   </body>
 </html>
