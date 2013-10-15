@@ -87,12 +87,16 @@ angular.module('app').controller('ChartCtrl', [ '$scope', function ChartCtrl($sc
         // recent items recent items
 	container = $('#chart-container')
         if ($scope.currChart) {
+	    console.log("cleaning up old chart");
             if (typeof($scope.currChart.dispose) == 'function') {
+		console.log("chart has dispose method; calling it");
                 $scope.currChart.dispose();
             }
-            container.children().remove();
+	    console.log("emptying the container of children");
+            container.empty();
         }
 
+	console.log("creating new chart");
         $scope.currChart = new chartFn(container, result);
 
         window.console.log("Loaded " + chartFn.chartName +
@@ -143,6 +147,11 @@ function Table(target, queryResult) {
         "aaData": queryResult.data,
         "aoColumns": massageColumns(queryResult)
     });
+
+    this.dispose = function() {
+	console.log("destroying old data table");
+	table.dataTable().fnDestroy();
+    }
 }
 Table.chartName = 'Table'
 Table.accepts = function(queryResult) {
