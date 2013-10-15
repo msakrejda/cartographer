@@ -21,6 +21,7 @@ angular.module('app').controller('QueryCtrl', ['$scope', 'QueryService', functio
     };
 
     $scope.selectResult = function(result) {
+	console.log("selecting result: " + result.id);
         if (result != $scope.selectedResult) {
             $scope.selectedResult = result
             $scope.$broadcast('resultSelected', result);
@@ -28,10 +29,21 @@ angular.module('app').controller('QueryCtrl', ['$scope', 'QueryService', functio
     };
 
     qs.onQuery(function(query) {
-	$scope.results.push(query);
+	$scope.addResult(query);
     });
 
     qs.onClose(function(reason) {
 	$scope.connected = false;
     });
+}]);
+
+angular.module('app').controller('ChartCtrl', [ '$scope', function ChartCtrl($scope) {
+
+    $scope.selectedResult = null;
+
+    $scope.$on('resultSelected', function(event, queryResult) {
+	console.log("update selectedResult to: " + queryResult.id);
+        $scope.selectedResult = queryResult;
+    });
+
 }]);

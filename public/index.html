@@ -1,14 +1,18 @@
 <html ng-app="app">
   <head>
-    <title>cartographer dataflow prototype</title>
+    <title>Cartographer</title>
     <link href="assets/css/base.css" rel="stylesheet" type="text/css"></link>
+    <style type="text/css" title="currentStyle">
+      @import "vendor/datatables/css/demo_table.css";
+    </style>
+
     <script type="text/javascript" src="vendor/jquery/jquery-2.0.3.min.js"></script>
     <script type="text/javascript" src="vendor/angular/angular.js"></script>
-    <script type="text/javascript">
-      var myAppModule = angular.module('app', []);
-    </script>
+    <script type="text/javascript" src="vendor/datatables/js/jquery.dataTables.min.js"></script>
+    <script type="text/javascript" src="assets/javascripts/app.js"></script>
     <script type="text/javascript" src="assets/javascripts/services.js"></script>
     <script type="text/javascript" src="assets/javascripts/controllers.js"></script>
+    <script type="text/javascript" src="assets/javascripts/directives.js"></script>
   </head>
   <body ng-controller="QueryCtrl">
     <div style="width:100%">
@@ -34,6 +38,9 @@
             </p>
           </li>
         </ul>
+      </div>
+      <div class="chartBox" ng-controller="ChartCtrl">
+	<grid result-set="selectedResult"></grid>
       </div>
 <!--      <div class="chartBox"style="" ng-controller="ChartCtrl">
         <ul class="chartList">
