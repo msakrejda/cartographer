@@ -48,6 +48,7 @@ angular.module('app').controller('ChartCtrl', [ '$scope', function ChartCtrl($sc
 	console.log("update selectedResult to: " + queryResult.id);
         $scope.selectedResult = queryResult;
         if (queryResult) {
+	    // TODO: drop reloads, do sticky chart selection instead
             if (canReload(queryResult)) {
                 $scope.currChart.reload(queryResult);
             } else {
@@ -104,6 +105,7 @@ angular.module('app').controller('ChartCtrl', [ '$scope', function ChartCtrl($sc
     }
 
     $scope.addChart(Table);
+    $scope.addChart(LineChart);
 
 }]);
 
@@ -141,7 +143,7 @@ function Table(target, queryResult) {
         });
     }
 
-    table = $('<table class="display"></table>').appendTo(target);
+    var table = $('<table class="display"></table>').appendTo(target);
     table.dataTable({
         "bDestroy": true,
         "aaData": queryResult.data,
@@ -153,7 +155,161 @@ function Table(target, queryResult) {
 	table.dataTable().fnDestroy();
     }
 }
-Table.chartName = 'Table'
+Table.chartName = 'table'
 Table.accepts = function(queryResult) {
     return true;
 }
+
+chart_template = '<div id="chart_wrapper">' +
+  '<div id="y_axis"></div>' +
+  '<div id="chart"></div>' +
+  '<div id="legend"></div>' +
+  '<form id="offset_form" class="toggler">' +
+    '<input type="radio" name="offset" id="lines" value="lines" checked>' +
+    '<label class="lines" for="lines">lines</label><br>' +
+    '<input type="radio" name="offset" id="stack" value="zero">' +
+    '<label class="stack" for="stack">stack</label>' +
+  '</form>' +
+'</div>'
+
+function LineChart(target, queryResult) {
+    var palette = new Rickshaw.Color.Palette();
+    var chart = $(chart_template).appendTo(target)
+
+    var tsCol = firstIdx(queryResult.columns, 'time.Time')
+    var numCols = allIdx(queryResult.columns, 'int32', 'int64', 'float32', 'float64')
+    series = numCols.map(function(numCol) {
+	var remapped = remapData(queryResult.data, tsCol, numCol)
+	var parsed = parseTimes(remapped)
+	return {
+	    name: queryResult.columns[numCol].name,
+	    data: parsed,
+	    color: palette.color()	    
+	}
+    });
+
+    var graph = new Rickshaw.Graph({
+        element: document.querySelector("#chart"),
+        width: 540,
+        height: 240,
+        renderer: 'line',
+        series: series
+    });
+
+    // TODO: avoid all the DOM fetches by, e.g., building the template
+    // piecemeal
+    var x_axis = new Rickshaw.Graph.Axis.Time( { graph: graph } );
+    var y_axis = new Rickshaw.Graph.Axis.Y( {
+        graph: graph,
+        orientation: 'left',
+        tickFormat: Rickshaw.Fixtures.Number.formatKMBT,
+        element: document.getElementById('y_axis'),
+    } );
+
+    // TODO: directive-ify or at least angular-ify
+    var legend = new Rickshaw.Graph.Legend( {
+        element: document.querySelector('#legend'),
+        graph: graph
+    } );
+    var offsetForm = document.getElementById('offset_form');
+
+    offsetForm.addEventListener('change', function(e) {
+        var offsetMode = e.target.value;
+        if (offsetMode == 'lines') {
+            graph.setRenderer('line');
+            graph.offset = 'zero';
+        } else {
+            graph.setRenderer('stack');
+            graph.offset = offsetMode;
+        }       
+        graph.render();
+
+    }, false);
+
+    graph.render();
+
+    this.dispose = function() {
+	console.log("destroying chart")
+    }
+}
+
+LineChart.chartName = 'line'
+LineChart.accepts = function(queryResult) {
+    var cols = queryResult.columns;
+    return hasCol(cols, 'time.Time') && hasCol(cols, 'int32', 'int64', 'float32', 'float64');
+}
+
+function remapData(data, xIdx, yIdx) {
+    return data.map(function(item) {
+        return { 'x': item[xIdx], 'y': item[yIdx] };
+    });
+}
+
+function parseTimes(data) {
+    return data.map(function(item) {
+	oldX = item['x']
+	newX = (new Date(oldX).getTime() / 1000)
+	console.log("mapping " + oldX + " to " + newX)
+	return {
+	    'x': newX, 'y': item['y']
+	}
+    })
+}
+
+function hasCol(cols, types) {
+    for (var i = 1; i < arguments.length; i++) {
+        if (firstIdx(cols, arguments[i]) > -1) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function firstIdx(cols, ofType) {
+    for (var i = 0; i < cols.length; i++){
+        for (var j = 1; j < arguments.length; j++) {
+            if (cols[i].type == arguments[j]) {
+                return i;
+            }
+        }
+    }
+    return -1;
+}
+
+function allIdx(cols, ofType) {
+    var result = [];
+    for (var i = 0; i < cols.length; i++) {
+        for (var j = 1; j < arguments.length; j++) {
+            if (cols[i].type == arguments[j]) {
+                result.push(i);
+                // No point checking the other types for this col
+                continue;
+            }
+        }
+    }
+    return result;
+}
+
+// chart types: table / bar (clustered/stacked) / line /
+//  area (stacked) / pie / scatter plot / maps / single value
+
+// TODO:
+// add multiple series
+// add stacked area charts
+// UI cleanup
+//  - styling
+//  - sizing
+//  - additional query list interactivity
+//    * lightbox for full query text
+//    * explain
+//    * re-run
+// add csv/pdf export
+// share (!)
+// add maps
+// add ability to select "active" fields for charts
+// add ability to turn on/off fields for multi-series charts
+// add stacked/clustered bar chart (toggle? or two separate?)
+// add pie
+// add scatter plot
+// add single value
+// sort series by time if not sorted for timeseries
