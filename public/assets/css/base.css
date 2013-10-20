@@ -132,4 +132,14 @@ li.selectedChart {
 #y_axis {
     float: left;
     width: 40px;
+    height: 500px;
+}
+
+/* for datatables */
+table.pretty tbody tr.even td {
+    background: #FFFFFF;
+}
+
+table.pretty tbody tr.odd td {
+    background: #CCCCCC;
 }

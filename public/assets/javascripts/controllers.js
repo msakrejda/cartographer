@@ -145,7 +145,7 @@ function Table(target, queryResult) {
         });
     }
 
-    var table = $('<table class="display"></table>').appendTo(target);
+    var table = $('<table class="display pretty"></table>').appendTo(target);
     table.dataTable({
         "bDestroy": true,
         "aaData": queryResult.data,
