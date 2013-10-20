@@ -114,9 +114,10 @@ function Table(target, queryResult) {
         return numstr.length == len ? numstr : '0' + zpad(numstr, len - 1);
     }
     function formatDate(d) {
+	// TODO: timezone info
         return d.getFullYear() + '-' +
             zpad((d.getMonth() + 1).toString(), 2) + '-' +
-            zpad((d.getDate()).toString(), 2) + ' ' +
+            zpad((d.getDate()).toString(), 2) + '&nbsp;' +
             zpad((d.getHours()).toString(), 2) + ':' +
             zpad((d.getMinutes()).toString(), 2) + ':' +
             zpad((d.getSeconds()).toString(), 2) + '.' +
@@ -125,14 +126,14 @@ function Table(target, queryResult) {
 
     function massageColumns(queryResult) {
         return queryResult.columns.map(function(column) {
-            var tableColumn = {
+            const tableColumn = {
                 "sTitle": column.name
             };
             if (isNumeric(column)) {
                 tableColumn.sClass = 'right-align';
+		const precision = isInteger(column) ? '0' : '3'
                 tableColumn.fnRender = function(obj) {
-                    var result = obj.aData[obj.iDataColumn];
-                    return result.toFixed(column.type == 'integer' ? 0 : 3);
+                    return obj.aData[obj.iDataColumn].toFixed(precision);
                 }
             } else if (isDate(column)) {
                 tableColumn.fnRender = function(obj) {
@@ -288,6 +289,19 @@ function allIdx(cols, ofType) {
         }
     }
     return result;
+}
+
+function isNumeric(column) {
+    return column.type == 'int32' || column.type == 'int64' ||
+	column.type == 'float32' || column.type == 'float64';
+}
+
+function isInteger(column) {
+    return column.type == 'int32' || column.type == 'int64';
+}
+
+function isDate(column) {
+    return column.type == 'time.Time';
 }
 
 // chart types: table / bar (clustered/stacked) / line /
