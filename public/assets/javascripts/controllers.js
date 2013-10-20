@@ -106,6 +106,7 @@ angular.module('app').controller('ChartCtrl', [ '$scope', function ChartCtrl($sc
 
     $scope.addChart(Table);
     $scope.addChart(LineChart);
+    $scope.addChart(AreaChart);
 
 }]);
 
@@ -165,15 +166,9 @@ chart_template = '<div id="chart_wrapper">' +
   '<div id="y_axis"></div>' +
   '<div id="chart"></div>' +
   '<div id="legend"></div>' +
-  '<form id="offset_form" class="toggler">' +
-    '<input type="radio" name="offset" id="lines" value="lines" checked>' +
-    '<label class="lines" for="lines">lines</label><br>' +
-    '<input type="radio" name="offset" id="stack" value="zero">' +
-    '<label class="stack" for="stack">stack</label>' +
-  '</form>' +
-'</div>'
+'</div>';
 
-function LineChart(target, queryResult) {
+function RickshawChart(target, queryResult) {
     var palette = new Rickshaw.Color.Palette();
     var chart = $(chart_template).appendTo(target)
 
@@ -193,39 +188,26 @@ function LineChart(target, queryResult) {
         element: document.querySelector("#chart"),
         width: 540,
         height: 240,
-        renderer: 'line',
+        renderer: this.renderer,
+	offset: this.offset,
         series: series
     });
 
     // TODO: avoid all the DOM fetches by, e.g., building the template
     // piecemeal
-    var x_axis = new Rickshaw.Graph.Axis.Time( { graph: graph } );
-    var y_axis = new Rickshaw.Graph.Axis.Y( {
+    var x_axis = new Rickshaw.Graph.Axis.Time({ graph: graph });
+    var y_axis = new Rickshaw.Graph.Axis.Y({
         graph: graph,
         orientation: 'left',
         tickFormat: Rickshaw.Fixtures.Number.formatKMBT,
         element: document.getElementById('y_axis'),
-    } );
+    });
 
     // TODO: directive-ify or at least angular-ify
-    var legend = new Rickshaw.Graph.Legend( {
+    var legend = new Rickshaw.Graph.Legend({
         element: document.querySelector('#legend'),
         graph: graph
-    } );
-    var offsetForm = document.getElementById('offset_form');
-
-    offsetForm.addEventListener('change', function(e) {
-        var offsetMode = e.target.value;
-        if (offsetMode == 'lines') {
-            graph.setRenderer('line');
-            graph.offset = 'zero';
-        } else {
-            graph.setRenderer('stack');
-            graph.offset = offsetMode;
-        }       
-        graph.render();
-
-    }, false);
+    });
 
     graph.render();
 
@@ -234,8 +216,28 @@ function LineChart(target, queryResult) {
     }
 }
 
+function LineChart(target, queryResult) {
+    this.renderer = 'line';
+    this.offset = 'zero';
+
+    RickshawChart.call(this, target, queryResult);
+}
+
 LineChart.chartName = 'line'
 LineChart.accepts = function(queryResult) {
+    var cols = queryResult.columns;
+    return hasCol(cols, 'time.Time') && hasCol(cols, 'int32', 'int64', 'float32', 'float64');
+}
+
+function AreaChart(target, queryResult) {
+    this.renderer = 'stack';
+    this.offset = 'stack';
+
+    RickshawChart.call(this, target, queryResult);
+}
+
+AreaChart.chartName = 'area'
+AreaChart.accepts = function(queryResult) {
     var cols = queryResult.columns;
     return hasCol(cols, 'time.Time') && hasCol(cols, 'int32', 'int64', 'float32', 'float64');
 }
@@ -308,11 +310,12 @@ function isDate(column) {
 //  area (stacked) / pie / scatter plot / maps / single value
 
 // TODO:
-// add multiple series
+// ! add multiple series
 // add stacked area charts
 // UI cleanup
 //  - styling
 //  - sizing
+//  - buffer for chart y range
 //  - additional query list interactivity
 //    * lightbox for full query text
 //    * explain
@@ -320,6 +323,7 @@ function isDate(column) {
 // add csv/pdf export
 // share (!)
 // add maps
+// multiple axes where reasonable
 // add ability to select "active" fields for charts
 // add ability to turn on/off fields for multi-series charts
 // add stacked/clustered bar chart (toggle? or two separate?)
