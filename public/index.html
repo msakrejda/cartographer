@@ -5,7 +5,7 @@
       @import "vendor/datatables/css/demo_table.css";
     </style>
     <link href="vendor/rickshaw/rickshaw.min.css" rel="stylesheet" type="text/css"></link>
-
+    <link href="http://fonts.googleapis.com/css?family=PT+Sans+Caption:400,700" rel="stylesheet" type="text/css">
     <link href="assets/css/base.css" rel="stylesheet" type="text/css"></link>
 
     <script type="text/javascript" src="vendor/jquery/jquery-2.0.3.min.js"></script>
@@ -20,11 +20,15 @@
     <script type="text/javascript" src="assets/javascripts/directives.js"></script>
   </head>
   <body ng-controller="QueryCtrl">
+    <div class="header">
+      <span class="title">Cartographer</span>
+      <span class="connOpt"><b>user:</b> maciek</span>
+      <span class="connOpt"><b>database:</b> maciek</span>
+    </div>
     <div style="width:100%">
       <div style="width:300px;float:left">
-        <h3>Queries</h3>
         <p class="queryFilter">
-          Filter:<input ng-model="search"></input>
+          <input ng-model="search" placeholder="filter query list"></input>
         </p>
         <ul class="resultList">
           <li class="result"

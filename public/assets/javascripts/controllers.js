@@ -157,15 +157,15 @@ function Table(target, queryResult) {
 	table.dataTable().fnDestroy();
     }
 }
-Table.chartName = 'table'
+Table.chartName = 'TABLE'
 Table.accepts = function(queryResult) {
     return true;
 }
 
 chart_template = '<div id="chart_wrapper">' +
-  '<div id="y_axis"></div>' +
-  '<div id="chart"></div>' +
-  '<div id="legend"></div>' +
+  '<div id="y_axis" style="float:left"></div>' +
+  '<div id="chart" style="width:800px;float:left;"></div>' +
+  '<div id="legend" style="float:left;"></div>' +
 '</div>';
 
 function RickshawChart(target, queryResult) {
@@ -186,8 +186,6 @@ function RickshawChart(target, queryResult) {
 
     var graph = new Rickshaw.Graph({
         element: document.querySelector("#chart"),
-        width: 540,
-        height: 240,
         renderer: this.renderer,
 	offset: this.offset,
         series: series
@@ -223,7 +221,7 @@ function LineChart(target, queryResult) {
     RickshawChart.call(this, target, queryResult);
 }
 
-LineChart.chartName = 'line'
+LineChart.chartName = 'LINE'
 LineChart.accepts = function(queryResult) {
     var cols = queryResult.columns;
     return hasCol(cols, 'time.Time') && hasCol(cols, 'int32', 'int64', 'float32', 'float64');
@@ -236,7 +234,7 @@ function AreaChart(target, queryResult) {
     RickshawChart.call(this, target, queryResult);
 }
 
-AreaChart.chartName = 'area'
+AreaChart.chartName = 'AREA'
 AreaChart.accepts = function(queryResult) {
     var cols = queryResult.columns;
     return hasCol(cols, 'time.Time') && hasCol(cols, 'int32', 'int64', 'float32', 'float64');

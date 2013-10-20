@@ -4,10 +4,30 @@ td.right-align {
 
 body {
     overflow-y:scroll;
+    font-family: 'PT Sans Caption', sans-serif;
 }
 
 text {
     font: 12px sans-serif;
+}
+
+.header {
+    text-align: bottom;
+    width: 100%;
+    padding-bottom: 20px;
+}
+
+.header > .title {
+    display:inline-block;
+    font-size: 24px;
+    bottom: 0;
+}
+
+.header > .connOpt {
+    display: inline-block;
+    font-size: 18px;
+    padding-left: 30px;
+    bottom: 0;
 }
 
 svg {
@@ -15,12 +35,11 @@ svg {
 }
 
 #chart-container {
-    height: 600px;
-    width: 800px;
+    height: 720px;
+    width: 960px;
     min-width: 100px;
     min-height: 100px;
 }
-
 
 ul.resultList {
     list-style-type:none;width:200px
@@ -55,6 +74,8 @@ li.selectedResult {
 }
 
 .queryFilter {
+    padding-left:20px;
+    margin-top:0px;
     font-size:10px
 }
 
@@ -67,14 +88,14 @@ li.selectedResult {
 }
 
 .chartBox {
-    float:left
+    float:left;
 }
 
 .chartList {
     list-style-type:none;
     margin:0;
     padding:0;
-    height:80px
+    height:40px
 }
 
 .chartOption {
@@ -83,6 +104,7 @@ li.selectedResult {
     display:block;
     background-color: #CCCCCC;
     text-align:center;
+    font-weight: bold;
 }
 
 li.selectedChart {
@@ -102,11 +124,6 @@ li.selectedChart {
 #legend {
         float: left;
         margin-left: 15px;
-}
-#offset_form {
-        float: left;
-        margin: 2em 0 0 15px;
-        font-size: 13px;
 }
 #y_axis {
         float: left;
