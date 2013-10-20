@@ -163,9 +163,9 @@ Table.accepts = function(queryResult) {
 }
 
 chart_template = '<div id="chart_wrapper">' +
-  '<div id="y_axis" style="float:left"></div>' +
-  '<div id="chart" style="width:800px;float:left;"></div>' +
-  '<div id="legend" style="float:left;"></div>' +
+  '<div id="y_axis"></div>' +
+  '<div id="chart"></div>' +
+  '<div id="legend"></div>' +
 '</div>';
 
 function RickshawChart(target, queryResult) {
