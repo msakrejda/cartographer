@@ -7,20 +7,13 @@ for your `psql` session without getting in the way.
 
 ### Usage
 
-At this time, you'll just see the query traffic logged. Cartographer
-is in progress.
-
-Right now, you must have a locally installed version of
-[FEMEBE](https://github.com/deafbybeheading/cartographer.git) to run
-Cartographer (it will be `go get`-able eventually).
-
- In $GOROOT/src
+You must have Go installed and GOPATH configured correctly.
 
 ```console
-$ git clone git@github.com:deafbybeheading/cartographer.git
-$ cd cartographer
-$ go get
-$ $GOROOT/bin/cartographer localhost:65432 /var/run/postgresql/.s.PGSQL.5434
+$ go get github.com/deafbybeheading/cartographer
+$ cd $GOPATH/src/github.com/deafbybeheading/cartographer
+$ go build ./...
+$ ./cartographer localhost:65432 /var/run/postgresql/.s.PGSQL.5434
 ```
 
 This will block. The first argument is the address Cartographer will
