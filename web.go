@@ -1,8 +1,8 @@
 package main
 
 import (
-	"code.google.com/p/go.net/websocket"
 	"fmt"
+	"golang.org/x/net/websocket"
 	"log"
 	"net/http"
 	"sync"

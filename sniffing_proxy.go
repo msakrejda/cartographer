@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/deafbybeheading/femebe"
-	"github.com/deafbybeheading/femebe/core"
-	"github.com/deafbybeheading/femebe/proto"
+	"github.com/uhoh-itsmaciek/femebe"
+	"github.com/uhoh-itsmaciek/femebe/core"
+	"github.com/uhoh-itsmaciek/femebe/proto"
 )
 
 type sniffingRouter struct {

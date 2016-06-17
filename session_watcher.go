@@ -2,9 +2,9 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/deafbybeheading/femebe/codec"
-	"github.com/deafbybeheading/femebe/core"
-	"github.com/deafbybeheading/femebe/proto"
+	"github.com/uhoh-itsmaciek/femebe/codec"
+	"github.com/uhoh-itsmaciek/femebe/core"
+	"github.com/uhoh-itsmaciek/femebe/proto"
 	"log"
 )
 

@@ -10,8 +10,8 @@ for your `psql` session without getting in the way.
 You must have Go installed and GOPATH configured correctly.
 
 ```console
-$ go get github.com/deafbybeheading/cartographer
-$ cd $GOPATH/src/github.com/deafbybeheading/cartographer
+$ go get github.com/uhoh-itsmaciek/cartographer
+$ cd $GOPATH/src/github.com/uhoh-itsmaciek/cartographer
 $ go build ./...
 $ ./cartographer localhost:65432 /var/run/postgresql/.s.PGSQL.5434
 ```
